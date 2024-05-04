@@ -2,8 +2,6 @@
 
 This repo contains training and testing code for the manga censorship segmentation and is based on OpenMMLab. 
 
-Pretrained models: `To be uploaded`
-
 ## Quick start:
 
 ### Step 1: Download the pretrained model:
@@ -51,12 +49,13 @@ I had issues with convergence, so I had to split the training in two steps:
 PYTHONPATH=. python tools/train.py configs/convnext/convnext_h_512_pretrain.py --cfg-options train_dataloader.dataset.data_root=<path to the dataset directory>
 ```
 
+You can download the pretrained model from `https://mega.nz/file/BA4ViZjY#OS3N4O1dIsXZ9FoRqSX8BqHBhnX0BwzbatmxIT9DozU`
+
 #### Step 2 - finetune the trained model on 1024x1024 resolution: 
 
 ```
 PYTHONPATH=. python tools/train.py configs/convnext/convnext_h.py --cfg-options train_dataloader.dataset.data_root=<path to the dataset directory>
 ```
-
 
 You should use `tools/dist_train.sh` for multi-gpu training.
 
@@ -75,3 +74,5 @@ annot_train.txt train
 `annot_train.txt` - contains lines in the format `img_name OK <bboxes>`.
 
 Example: `img00000000_00000008.jpg OK 1279 830 1583 1145 1329 144 1436 251`
+
+TODO: add dataset collection scripts
