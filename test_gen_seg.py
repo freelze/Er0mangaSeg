@@ -201,7 +201,8 @@ def draw_angled_rec(x0, y0, width, height, angle, img, color, img_x, img_y, mode
     return(points2)
 
 
-
+def make_mask(sx, sy):
+    return augment((0, 0, sx, sy))
 
 
 def augment(region):
