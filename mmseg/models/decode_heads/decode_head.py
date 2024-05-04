@@ -335,6 +335,19 @@ class BaseDecodeHead(BaseModule, metaclass=ABCMeta):
 
         loss['acc_seg'] = accuracy(
             seg_logits, seg_label, ignore_index=self.ignore_index)
+        with torch.no_grad():
+            THRESH = 0.5
+            p = nn.functional.softmax(seg_logits, dim=1)[:, 1, :, :].detach() > THRESH
+            t = seg_label == 1
+            tp = (p & t).sum()
+            fp = (p & (~t)).sum()
+            fn = ((~p) & t).sum()
+            pr = tp/(tp+fp)
+            rc = tp/(tp+fn)
+            f = 2*tp/(2*tp+fp+fn)
+            loss['prec'] = pr
+            loss['rec'] = rc
+            loss['f'] = f
         return loss
 
     def predict_by_feat(self, seg_logits: Tensor,

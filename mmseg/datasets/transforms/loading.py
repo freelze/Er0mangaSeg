@@ -1,6 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import warnings
-from pathlib import Path
 from typing import Dict, Optional, Union
 
 import mmcv
@@ -13,10 +12,147 @@ from mmcv.transforms import LoadImageFromFile
 from mmseg.registry import TRANSFORMS
 from mmseg.utils import datafrombytes
 
+# TODO: test_gen_seg needs heavy refactoring
+from test_gen_seg import augment, aug_coord, rand_color
+
+import cv2
+import os
+import io
+
 try:
     from osgeo import gdal
 except ImportError:
     gdal = None
+
+
+
+@TRANSFORMS.register_module()
+class CreateAnnotations(MMCV_LoadAnnotations):
+    """
+        This transform loads the image and creates bar censorship on the fly.
+
+    """
+
+    def __init__(
+        self,
+        reduce_zero_label=None,
+        backend_args=None,
+        imdecode_backend='pillow',
+    ) -> None:
+        super().__init__(
+            with_bbox=False,
+            with_label=False,
+            with_seg=True,
+            with_keypoints=False,
+            imdecode_backend=imdecode_backend,
+            backend_args=backend_args)
+        self.reduce_zero_label = reduce_zero_label
+        if self.reduce_zero_label is not None:
+            raise Exception('wtf')
+            warnings.warn('`reduce_zero_label` will be deprecated, '
+                          'if you would like to ignore the zero label, please '
+                          'set `reduce_zero_label=True` when dataset '
+                          'initialized')
+        self.imdecode_backend = imdecode_backend
+
+    def _load_seg_map(self, results: dict) -> None:
+        if 'img' in results:
+
+            img = results['img']
+            H, W = img.shape[:2]
+            gt_semantic_seg = np.zeros(shape=(H, W), dtype=np.uint8)
+            try:
+
+                rand = False
+                encode_after = True
+                if rand:
+                    n_reg = np.random.randint(1, 8)
+                    boxes = np.zeros(shape=(n_reg, 4), dtype=np.int32)
+                    for i in range(n_reg):
+                        h = np.random.randint(int(min(H,W)*0.03), int(min(H,W)*0.3))
+                        w = int(h*np.random.uniform(0.5, 2.0))
+                        sx = np.random.randint(H-h-1)
+                        sy = np.random.randint(W-w-1)
+                        bbox = [sx, sy, sx + h, sy + w]
+                        boxes[i] = bbox
+                else:
+                    boxes = results['boxes']
+
+                n_reg = boxes.shape[0]
+                for i in range(n_reg):
+                    coord = boxes[i]
+                    if not rand:
+                        (xmin, ymin, xmax, ymax) = aug_coord(coord, img.shape[0], img.shape[1])
+                    else:
+                        (xmin, ymin, xmax, ymax) = coord
+
+                    mask = augment((0, 0, (ymax-ymin)*2, (xmax-xmin)*2))
+                    mask = cv2.resize(mask, (mask.shape[1]//2, mask.shape[0]//2), cv2.INTER_AREA).astype(np.float32)/255
+                    mask_reg = results['img'][xmin:xmax, ymin:ymax, :].astype(np.float32)
+
+
+                    color = [results['img'][..., 0].min(), results['img'][..., 1].min(), results['img'][..., 2].min()]
+
+                    col = np.ones(shape=(xmax-xmin, ymax-ymin, 3), dtype=np.uint8)
+                    col[..., 0] *= color[0]
+                    col[..., 1] *= color[1]
+                    col[..., 2] *= color[2]
+                    mask_reg = mask_reg*(1-mask) + col * mask
+                    mask_reg = mask_reg.astype(np.uint8)
+
+                    if not encode_after:
+                        is_success, buf = cv2.imencode(".jpg", mask_reg, [cv2.IMWRITE_JPEG_QUALITY, 90])
+                        if not is_success:
+                            raise Exception('err encode')
+                        io_buf = io.BytesIO(buf)
+                        mask_reg = cv2.imdecode(np.frombuffer(io_buf.getbuffer(), np.uint8), -1)
+
+                    results['img'][xmin:xmax, ymin:ymax, :] = mask_reg
+                    gt_semantic_seg[xmin:xmax, ymin:ymax] |= mask[..., 0].round().astype(np.uint8)
+
+
+            except Exception as e:
+                print(e)
+                pass
+
+        if encode_after:
+            is_success, buf = cv2.imencode(".jpg", results['img'], [cv2.IMWRITE_JPEG_QUALITY, 90])
+            if not is_success:
+                raise Exception('err encode')
+            io_buf = io.BytesIO(buf)
+            results['img'] = cv2.imdecode(np.frombuffer(io_buf.getbuffer(), np.uint8), -1)
+
+
+        # reduce zero_label
+        if self.reduce_zero_label is None:
+            self.reduce_zero_label = results['reduce_zero_label']
+        assert self.reduce_zero_label == results['reduce_zero_label'], \
+            'Initialize dataset with `reduce_zero_label` as ' \
+            f'{results["reduce_zero_label"]} but when load annotation ' \
+            f'the `reduce_zero_label` is {self.reduce_zero_label}'
+        if self.reduce_zero_label:
+            # avoid using underflow conversion
+            gt_semantic_seg[gt_semantic_seg == 0] = 255
+            gt_semantic_seg = gt_semantic_seg - 1
+            gt_semantic_seg[gt_semantic_seg == 254] = 255
+        # modify if custom classes
+        if results.get('label_map', None) is not None:
+            # Add deep copy to solve bug of repeatedly
+            # replace `gt_semantic_seg`, which is reported in
+            # https://github.com/open-mmlab/mmsegmentation/pull/1445/
+            gt_semantic_seg_copy = gt_semantic_seg.copy()
+            for old_id, new_id in results['label_map'].items():
+                gt_semantic_seg[gt_semantic_seg_copy == old_id] = new_id
+        results['gt_seg_map'] = gt_semantic_seg
+        #print((results['gt_seg_map'] == 0).sum(), (results['gt_seg_map'] == 1).sum(), ((results['gt_seg_map'] != 0) & (results['gt_seg_map'] != 1)).sum())
+        results['seg_fields'].append('gt_seg_map')
+
+    def __repr__(self) -> str:
+        repr_str = self.__class__.__name__
+        repr_str += f'(reduce_zero_label={self.reduce_zero_label}, '
+        repr_str += f"imdecode_backend='{self.imdecode_backend}', "
+        repr_str += f'backend_args={self.backend_args})'
+        return repr_str
 
 
 @TRANSFORMS.register_module()

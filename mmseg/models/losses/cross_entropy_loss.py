@@ -9,6 +9,36 @@ from mmseg.registry import MODELS
 from .utils import get_class_weight, weight_reduce_loss
 
 
+def simple_cross_entropy(pred,
+                  label,
+                  weight=None,
+                  class_weight=None,
+                  reduction='mean',
+                  avg_factor=None,
+                  ignore_index=-100,
+                  avg_non_ignore=False):
+    """
+        Very simple balanced cross entropy for two classes
+    """
+
+    loss = F.cross_entropy(
+        pred,
+        label,
+        weight=class_weight,
+        reduction='none',
+        ignore_index=ignore_index)
+
+
+    idx0 = label == 0
+    idx1 = label == 1
+
+    loss0 = loss[idx0].mean()
+    loss1 = loss[idx1].mean()
+    loss = loss0 + loss1
+
+    return loss.sum()
+
+
 def cross_entropy(pred,
                   label,
                   weight=None,
@@ -233,6 +263,7 @@ class CrossEntropyLoss(nn.Module):
     def __init__(self,
                  use_sigmoid=False,
                  use_mask=False,
+                 use_simple=False,
                  reduction='mean',
                  class_weight=None,
                  loss_weight=1.0,
@@ -242,6 +273,7 @@ class CrossEntropyLoss(nn.Module):
         assert (use_sigmoid is False) or (use_mask is False)
         self.use_sigmoid = use_sigmoid
         self.use_mask = use_mask
+        self.use_simple = use_simple
         self.reduction = reduction
         self.loss_weight = loss_weight
         self.class_weight = get_class_weight(class_weight)
@@ -257,6 +289,8 @@ class CrossEntropyLoss(nn.Module):
             self.cls_criterion = binary_cross_entropy
         elif self.use_mask:
             self.cls_criterion = mask_cross_entropy
+        elif self.use_simple:
+            self.cls_criterion = simple_cross_entropy
         else:
             self.cls_criterion = cross_entropy
         self._loss_name = loss_name

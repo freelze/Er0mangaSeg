@@ -29,6 +29,47 @@ except ImportError:
     ALBU_INSTALLED = False
 
 
+def adjust_gamma(image, gamma=1.0):
+    # build a lookup table mapping the pixel values [0, 255] to
+    # their adjusted gamma values
+    invGamma = 1.0 / gamma
+    table = np.array([((i / 255.0) ** invGamma) * 255
+        for i in np.arange(0, 256)]).astype("uint8")
+    # apply gamma correction using the lookup table
+    return cv2.LUT(image, table)
+
+
+@TRANSFORMS.register_module()
+class Manyfilter(BaseTransform):
+    def __init__(self, gamma=None, median=False):
+        self.debug = False
+        self.gamma = gamma
+        self.median = median
+
+    def transform(self, results: dict) -> dict:
+
+        if self.median:
+            results['img'] = cv2.medianBlur(results['img'], 3)
+
+        if self.gamma is not None:
+            results['img'] = adjust_gamma(results['img'], self.gamma)
+
+        
+        if self.debug:
+            print(results['img'].shape)
+            n = os.path.basename(results['img_path'])
+            cv2.imwrite(f'./dbg_s/{n}.jpg', results['img'])
+            #cv2.imwrite(f'./dbg_s/{n}_new.jpg', new_img)
+            #cv2.imwrite(f'./dbg_s/{n}_m.jpg', results['gt_seg_map']*255)
+
+
+        return results
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        return repr_str
+
+
 @TRANSFORMS.register_module()
 class ResizeToMultiple(BaseTransform):
     """Resize images & seg to multiple of divisor.
