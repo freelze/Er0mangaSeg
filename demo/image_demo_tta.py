@@ -76,6 +76,13 @@ def inference_tta(model, img):
     return i_seg_pred*255, raw_mask
 
 
+def init_seg_model(config_path, checkpoint_path, device):
+    model = init_model(config_path, checkpoint_path, device=device)
+    if device == 'cpu':
+        model = revert_sync_batchnorm(model)
+    return model
+
+
 def main():
     parser = ArgumentParser()
     parser.add_argument('in_dir', help='Image file')
@@ -98,11 +105,7 @@ def main():
         '--title', default='result', help='The image identifier.')
     args = parser.parse_args()
 
-    # build the model from a config file and a checkpoint file
-    model = init_model(args.config, args.checkpoint, device=args.device)
-    if args.device == 'cpu':
-        model = revert_sync_batchnorm(model)
-    # test a single image
+    model = init_seg_model(args.config, args.checkpoint, args.device)
     
     files = os.listdir(args.in_dir)
     files = [f for f in files if f.endswith(('.png', ))]
