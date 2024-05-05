@@ -12,6 +12,70 @@ from mmseg.apis import inference_model, init_model, show_result_pyplot
 from mmseg.apis.utils import _preprare_data
 
 
+def inference_tta(model, img):
+
+    def infer(img, model, aug=None):
+
+        if aug:
+            tplo = deepcopy(model.cfg.test_pipeline)
+            tpl = deepcopy(tplo)
+            for v, e in enumerate(aug):
+                tpl.insert(1+v, e)
+            model.cfg.test_pipeline = tpl
+
+        data, is_batch = _preprare_data(img, model)
+        with torch.no_grad():
+            results = model.test_step(data)
+        if aug:
+            model.cfg.test_pipeline = tplo
+
+        return results if is_batch else results[0]
+
+    augs = [
+                [],
+
+
+                #[
+                #    {"type":'Manyfilter', 'median': True},
+                #],
+
+
+                [
+                    {'type':'RandomFlip', 'prob': 1.0, 'direction':'horizontal'},
+                    {"type":'Manyfilter', 'gamma': 0.3},
+                ],
+
+
+                [
+                    {'type':'RandomFlip', 'prob': 1.0, 'direction':'vertical'},
+                    {"type":'Manyfilter', 'gamma': 0.5},
+                    {"type":'Manyfilter', 'median': True},
+                ],
+
+    ]
+
+    total = None
+    for aug in augs:
+        result = infer(img, model, aug)
+        if total is None:
+            total = result.seg_logits_h
+        else:
+            total += result.seg_logits_h
+
+    total = total/len(augs)
+    i_seg_pred = np.zeros(shape=(total.shape[1], total.shape[2]), dtype=np.uint8)
+
+    p_seg = torch.nn.functional.softmax(total, dim=0).cpu().numpy()
+    THRESH = 0.4
+    idx = p_seg[1, :, :] > THRESH
+    i_seg_pred[idx] = 1
+    i_seg_pred[~idx] = 0
+
+    raw_mask = (p_seg[1, :, :] * 255).astype(np.uint8)
+
+    return i_seg_pred*255, raw_mask
+
+
 def main():
     parser = ArgumentParser()
     parser.add_argument('in_dir', help='Image file')
@@ -46,69 +110,7 @@ def main():
         in_file = os.path.join(args.in_dir, img)
         print(in_file)
 
-        def inference_tta(model, img):
-
-            def infer(img, model, aug=None):
-
-                if aug:
-                    tplo = deepcopy(model.cfg.test_pipeline)
-                    tpl = deepcopy(tplo)
-                    for v, e in enumerate(aug):
-                        tpl.insert(1+v, e)
-                    model.cfg.test_pipeline = tpl
-
-                data, is_batch = _preprare_data(img, model)
-                with torch.no_grad():
-                    results = model.test_step(data)
-                if aug:
-                    model.cfg.test_pipeline = tplo
-
-                return results if is_batch else results[0]
-
-            augs = [
-                        [],
-
-
-                        #[
-                        #    {"type":'Manyfilter', 'median': True},
-                        #],
-
-
-                        [
-                            {'type':'RandomFlip', 'prob': 1.0, 'direction':'horizontal'},
-                            {"type":'Manyfilter', 'gamma': 0.3},
-                        ],
-
-
-                        [
-                            {'type':'RandomFlip', 'prob': 1.0, 'direction':'vertical'},
-                            {"type":'Manyfilter', 'gamma': 0.5},
-                            {"type":'Manyfilter', 'median': True},
-                        ],
-
-            ]
-
-            total = None
-            for aug in augs:
-                result = infer(img, model, aug)
-                if total is None:
-                    total = result.seg_logits_h
-                else:
-                    total += result.seg_logits_h
-
-            total = total/len(augs)
-            i_seg_pred = np.zeros(shape=(total.shape[1], total.shape[2]), dtype=np.uint8)
-
-            p_seg = torch.nn.functional.softmax(total).cpu().numpy()
-            THRESH = 0.4
-            idx = p_seg[1, :, :] > THRESH
-            i_seg_pred[idx] = 1
-            i_seg_pred[~idx] = 0
-
-            return i_seg_pred*255
-
-
-        out_mask = inference_tta(model, in_file)
+        out_mask, raw_mask = inference_tta(model, in_file)
 
         #out_mask = result.pred_sem_seg.cpu().data.cpu().numpy().astype(np.uint8)[0]*255
         out_mask_fname = os.path.join(args.mask_dir, img)
