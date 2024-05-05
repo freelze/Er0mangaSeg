@@ -4,6 +4,15 @@ This repo contains training and testing code for the manga censorship segmentati
 
 ## Quick start:
 
+### Step 0: Install anaconda3/miniconda3 and create the environment:
+
+```
+conda env create -f env.yml
+conda activate openmmlab
+```
+
+BTW I recommend using `mamba` since it makes everything conda-related much faster.
+
 ### Step 1: Download the pretrained model:
 
 Download pretrained ConvNeXt model from `https://mega.nz/file/NNQTgR4Q#MuqoCZACOc9pBZ5BzafszLqa0MEnI65KJx4PXqgjV-k` and put it into the `pretrained` directory
