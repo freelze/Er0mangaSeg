@@ -1,6 +1,6 @@
 # Er0manga censorship segmentation
 
-This repo contains training and testing code for the manga censorship segmentation and is based on OpenMMLab. 
+This repo contains training and testing code for the manga censorship segmentation and is based on OpenMMLab. Currently, only dark-colored bar censorship is supported for colored and B&W images.
 
 ## Quick start:
 
