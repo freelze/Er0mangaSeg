@@ -23,9 +23,7 @@ Run the model on the demo image located in `demo_images/1.png`:
 
 ![demo](./demo_images/1.png)
 
-```
-PYTHONPATH=. python demo/image_demo.py ./demo_images configs/convnext/convnext_h.py ./pretrained/convnext_1024_iter_400.pth --out-dir ./output_debug --mask-dir ./output_mask
-```
+`PYTHONPATH=. python demo/image_demo.py ./demo_images configs/convnext/convnext_h.py ./pretrained/convnext_1024_iter_400.pth --out-dir ./output_debug --mask-dir ./output_mask`
 
 The debug output should look like this:
 
@@ -35,15 +33,11 @@ The debug output should look like this:
 
 ### Test the model:
 
-```
-PYTHONPATH=. python demo/image_demo.py <input image directory> configs/convnext/convnext_h.py <.pth checkpoint> --out-dir <output debug directory> --mask-dir <output mask directory>
-```
+`PYTHONPATH=. python demo/image_demo.py <input image directory> configs/convnext/convnext_h.py <.pth checkpoint> --out-dir <output debug directory> --mask-dir <output mask directory>`
 
 With Test Time Augmentations (TTA):
 
-```
-PYTHONPATH=. python demo/image_demo_tta.py <input image directory> configs/convnext/convnext_h.py <.pth checkpoint> --mask-dir <output mask directory>
-```
+`PYTHONPATH=. python demo/image_demo_tta.py <input image directory> configs/convnext/convnext_h.py <.pth checkpoint> --mask-dir <output mask directory>`
 
 You can try your own TTAs that might better suit the type of manga censorship you are dealing with.
 
@@ -54,17 +48,13 @@ I had issues with convergence, so I had to split the training in two steps:
 
 #### Step 1 - train the model on 512x512 resolution: 
 
-```
-PYTHONPATH=. python tools/train.py configs/convnext/convnext_h_512_pretrain.py --cfg-options train_dataloader.dataset.data_root=<path to the dataset directory>
-```
+`PYTHONPATH=. python tools/train.py configs/convnext/convnext_h_512_pretrain.py --cfg-options train_dataloader.dataset.data_root=<path to the dataset directory>`
 
 You can download the pretrained model from `https://mega.nz/file/BA4ViZjY#OS3N4O1dIsXZ9FoRqSX8BqHBhnX0BwzbatmxIT9DozU`
 
 #### Step 2 - finetune the trained model on 1024x1024 resolution: 
 
-```
-PYTHONPATH=. python tools/train.py configs/convnext/convnext_h.py --cfg-options train_dataloader.dataset.data_root=<path to the dataset directory>
-```
+`PYTHONPATH=. python tools/train.py configs/convnext/convnext_h.py --cfg-options train_dataloader.dataset.data_root=<path to the dataset directory>`
 
 You should use `tools/dist_train.sh` for multi-gpu training.
 
