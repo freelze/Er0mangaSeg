@@ -39,7 +39,7 @@ def main():
     # test a single image
     
     files = os.listdir(args.in_dir)
-    files = [f for f in files if f.endswith(('.png', ))]
+    files = [f for f in files if f.endswith(('.png', 'jpg', 'jpeg'))]
     for img in files:
         in_file = os.path.join(args.in_dir, img)
         print(in_file)
