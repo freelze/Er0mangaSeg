@@ -13,6 +13,19 @@ conda activate openmmlab
 
 BTW I recommend using `mamba` since it makes everything conda-related much faster.
 
+### Step 0-1: Install dependencies
+
+```
+pip install -r requirements.txt
+
+conda install pytorch==1.11.0 torchvision==0.12.0 cudatoolkit=11.3 -c pytorch
+
+pip install -U openmim
+mim install mmengine
+mim install "mmcv==2.1.0"
+pip install "mmsegmentation>=1.0.0"
+```
+
 ### Step 1: Download the pretrained model:
 
 Download pretrained ConvNeXt model from `https://mega.nz/file/NNQTgR4Q#MuqoCZACOc9pBZ5BzafszLqa0MEnI65KJx4PXqgjV-k` and put it into the `pretrained` directory
