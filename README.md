@@ -24,6 +24,7 @@ pip install -U openmim
 mim install mmengine
 mim install "mmcv==2.1.0"
 pip install "mmsegmentation>=1.0.0"
+mim install "mmpretrain>=1.0.0rc8"
 ```
 
 ### Step 1: Download the pretrained model:
